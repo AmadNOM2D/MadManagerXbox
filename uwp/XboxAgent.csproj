@@ -1,13 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetPlatformIdentifier>uap</TargetPlatformIdentifier>
-    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
-    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
+    <!-- Modern SDK-style UAP: TargetFramework, not the legacy TPI props -->
+    <TargetFramework>uap10.0.19041</TargetFramework>
     <OutputType>WinExe</OutputType>
     <RootNamespace>MadManagerXbox</RootNamespace>
     <AssemblyName>MadManagerXbox</AssemblyName>
-    <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
     <UseDotNetNativeToolchain>true</UseDotNetNativeToolchain>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
   </PropertyGroup>
