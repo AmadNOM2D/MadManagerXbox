@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- SDK-style UAP; the Microsoft.UAP workload (installed in CI) provides the uap10.0.19041 reference packs -->
-    <TargetFramework>uap10.0.19041</TargetFramework>
+    <!-- SDK-style UAP. CI auto-retargets this to the Win10 SDK present on the runner (see build.yml). -->
+    <TargetFramework>uap10.0.22621</TargetFramework>
     <OutputType>WinExe</OutputType>
     <RootNamespace>MadManagerXbox</RootNamespace>
     <AssemblyName>MadManagerXbox</AssemblyName>

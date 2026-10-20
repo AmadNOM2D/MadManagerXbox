@@ -30,7 +30,7 @@ jobs:
           '{"apiBase":"ws://' + $ip + ':8765"}' | Set-Content -NoNewline -Encoding utf8 -Path uwp\config.json
           Write-Host "config: $(Get-Content uwp\config.json)"
 
-      - name: Install VS Universal (UWP) workload (instruments + uses vswhere installPath)
+      - name: Install VS Universal (UWP) workload (uses vswhere installPath)
         run: |
           $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           if (-not (Test-Path $vswhere)) { $vswhere = "C:\ProgramData\Chocolatey\bin\vswhere.exe" }
@@ -44,17 +44,20 @@ jobs:
           & $installer modify --installPath "$installPath" --add Microsoft.VisualStudio.Workload.Universal --includeDependencies --quiet --norestart --nocache *>&1
           Write-Host "vs_installer exit code = $LASTEXITCODE"
           if ($LASTEXITCODE -ne 0) { throw "vs_installer modify failed (exit $LASTEXITCODE)" }
+
       - name: Build unsigned MSIX (SideloadOnly)
         run: |
-          msbuild "uwp\XboxAgent.csproj" `
-            /p:Configuration=Release `
-            /p:Platform=x64 `
-            /p:GenerateAppxPackageOnBuild=true `
-            /p:UapAppxPackageBuildMode=SideloadOnly `
-            /p:AppxBundle=Never `
-            /p:AppxPackageSigningEnabled=false `
-            /p:AppxPackageDir="$env:GITHUB_WORKSPACE\Packages" `
-            /m /v:minimal
+          $refs = 'C:\Program Files (x86)\Windows Kits\10\References'
+          $pack = Get-ChildItem $refs -Filter '10.0.*.uap' -Directory 2>$null |
+                  Sort-Object { [version]($_.Name -replace '\.uap$','') } -Descending |
+                  Select-Object -First 1
+          if (-not $pack) { throw "No UAP reference pack (10.0.*.uap) found under $refs -- install Win10 SDK + UWP workload" }
+          $tpi = $pack.Name -replace '\.uap$',''
+          Write-Host "Installed UAP ref pack: $($pack.Name) -> TargetPlatformVersion=$tpi"
+          $tfm = "uap" + $tpi
+          (Get-Content 'uwp\XboxAgent.csproj' -Raw) -replace 'uap10\.0\.\d+', $tfm | Set-Content -NoNewline 'uwp\XboxAgent.csproj'
+          Write-Host "csproj TFM: $(Select-String -Path 'uwp\XboxAgent.csproj' -Pattern 'TargetFramework')"
+          msbuild "uwp\XboxAgent.csproj" /p:Configuration=Release /p:Platform=x64 /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageSigningEnabled=false /p:AppxPackageDir="$env:GITHUB_WORKSPACE\Packages" /m /v:minimal
           if ($LASTEXITCODE -ne 0) { throw "MSBuild failed (exit $LASTEXITCODE)" }
 
       - name: Locate package
