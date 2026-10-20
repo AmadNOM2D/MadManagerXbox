@@ -1,0 +1,33 @@
+name: Diag2 UAP packs
+on:
+  workflow_dispatch:
+jobs:
+  d:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect UAP toolchain v2
+        run: |
+          $r = 'C:\Program Files (x86)\Windows Kits\10\References'
+          Write-Host "### Win10 SDK top-level folders under $r :"
+          if (Test-Path $r) { Get-ChildItem $r -Directory | Select-Object -Expand Name } else { Write-Host "NOT FOUND" }
+          Write-Host "### Any .uap folder anywhere under $r :"
+          if (Test-Path $r) { Get-ChildItem $r -Recurse -Filter '*.uap' -Directory -ErrorAction SilentlyContinue | Select-Object -Expand FullName } else { Write-Host "none" }
+          Write-Host "### dotnet packs matching UAP/WinUI/WindowsAppSDK :"
+          $p = 'C:\Program Files\dotnet\packs'
+          if (Test-Path $p) { Get-ChildItem $p -Directory | Where-Object { $_.Name -match 'UAP|WinUI|WindowsAppSDK|WindowsApp' } | Select-Object -Expand Name } else { Write-Host "NOT FOUND" }
+          Write-Host "### dotnet workload search uap :"
+          dotnet workload search uap --verbosity minimal 2>&1 | Select-Object -First 20
+          Write-Host "### VS installPath + Microsoft.Uap.targets existence :"
+          $vs = & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>$null
+          Write-Host "vswhere -> $vs"
+          $uapTargets = Join-Path $vs 'MSBuild\Microsoft\Windows Kits\10\MSBuild\Microsoft.Uap.targets'
+          Write-Host "Microsoft.Uap.targets at $uapTargets : $(Test-Path $uapTargets)"
+          Write-Host "### Win10 SDK Extension SDKs (for UAP) :"
+          $ext = Join-Path $vs 'MSBuild\Microsoft\Windows Kits\10\Extensions\... '
+          Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\Extension SDKs' -ErrorAction SilentlyContinue | Select-Object -Expand Name | Where-Object { $_ -match 'Windows' } | Select-Object -First 10
+          Write-Host "### global.json:"
+          (Get-Content global.json -ErrorAction SilentlyContinue | Out-String) 2>$null
