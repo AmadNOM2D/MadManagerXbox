@@ -30,6 +30,10 @@ jobs:
           '{"apiBase":"ws://' + $ip + ':8765"}' | Set-Content -NoNewline -Encoding utf8 -Path uwp\config.json
           Write-Host "config: $(Get-Content uwp\config.json)"
 
+      - name: Install UAP workload (Microsoft.UAP) -- provides uap10.0.19041 reference packs
+        run: |
+          dotnet workload install Microsoft.UAP --verbosity minimal
+          Write-Host "workloads: $(dotnet workload list)"
       - name: Build unsigned MSIX (SideloadOnly)
         run: |
           msbuild "uwp\XboxAgent.csproj" `
