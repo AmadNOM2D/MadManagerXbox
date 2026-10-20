@@ -1,0 +1,27 @@
+name: Diagnose UAP toolchain
+on:
+  workflow_dispatch:
+jobs:
+  diagnose:
+    runs-on: windows-2022
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect UAP toolchain (fast, no downloads)
+        run: |
+          Write-Host "=== dotnet SDKs ==="; dotnet --list-sdks 2>&1
+          $r = 'C:\Program Files (x86)\Windows Kits\10\References'
+          Write-Host "=== Win10 SDK Versions under $r ==="
+          if (Test-Path $r) { Get-ChildItem $r -Directory | Select-Object -Expand Name } else { Write-Host "NOT FOUND: $r" }
+          Write-Host "=== UAP .uap ref packs (legacy References) ==="
+          if (Test-Path $r) { Get-ChildItem $r -Recurse -Filter '10.0.*.uap' -Directory -ErrorAction SilentlyContinue | Select-Object -Expand FullName } else { Write-Host "none" }
+          $p = 'C:\Program Files\dotnet\packs'
+          Write-Host "=== dotnet packs (UAP/WindowsAppSDK/SDK refs) ==="
+          if (Test-Path $p) { Get-ChildItem $p -Directory | Where-Object { $_.Name -match 'UAP|WinUI|WindowsAppSDK|Microsoft.NETCore.App.Ref|Microsoft.WindowsApp' } | Select-Object -Expand Name } else { Write-Host "NOT FOUND: $p" }
+          Write-Host "=== dotnet workload list ==="; dotnet workload list 2>&1
+          Write-Host "=== workload search Microsoft.UAP ==="; dotnet workload search Microsoft.UAP 2>&1 | Select-Object -First 10
+          Write-Host "=== vswhere installPath ==="; & 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe' -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>&1
+          Write-Host "=== vs_installer present? ==="; Test-Path 'C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe'
+          Write-Host "=== global.json (if any) ==="; (Get-Content global.json -ErrorAction SilentlyContinue | Out-String) 2>$null
