@@ -1,8 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Modern SDK-style UAP: TargetFramework, not the legacy TPI props -->
-    <TargetFramework>uap10.0.19041</TargetFramework>
+    <TargetPlatformIdentifier>uap</TargetPlatformIdentifier>
+    <TargetPlatformVersion>10.0.19041.0</TargetPlatformVersion>
+    <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <OutputType>WinExe</OutputType>
     <RootNamespace>MadManagerXbox</RootNamespace>
     <AssemblyName>MadManagerXbox</AssemblyName>
