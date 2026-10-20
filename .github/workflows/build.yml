@@ -35,7 +35,7 @@ jobs:
           $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
           if (-not (Test-Path $vswhere)) { $vswhere = "C:\ProgramData\Chocolatey\bin\vswhere.exe" }
           Write-Host "vswhere = $vswhere (exists=$([bool](Test-Path $vswhere)))"
-          $installPath = & $vswhere -latest -products * -require Microsoft.Component.MSBuild -property installationPath 2>$null
+          $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>$null
           if (-not $installPath) { throw "vswhere returned no installPath" }
           Write-Host "VS installPath = $installPath"
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
