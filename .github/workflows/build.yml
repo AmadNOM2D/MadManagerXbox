@@ -30,31 +30,38 @@ jobs:
           '{"apiBase":"ws://' + $ip + ':8765"}' | Set-Content -NoNewline -Encoding utf8 -Path uwp\config.json
           Write-Host "config: $(Get-Content uwp\config.json)"
 
-      - name: Install VS Universal (UWP) workload (uses vswhere installPath)
+      - name: Install VS Universal (UWP) workload (--wait so it actually installs)
         run: |
           $vswhere = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe"
-          if (-not (Test-Path $vswhere)) { $vswhere = "C:\ProgramData\Chocolatey\bin\vswhere.exe" }
-          Write-Host "vswhere = $vswhere (exists=$([bool](Test-Path $vswhere)))"
           $installPath = & $vswhere -latest -products * -requires Microsoft.Component.MSBuild -property installationPath 2>$null
-          if (-not $installPath) { throw "vswhere returned no installPath" }
           Write-Host "VS installPath = $installPath"
           $installer = "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vs_installer.exe"
-          if (-not (Test-Path $installer)) { throw "vs_installer.exe not found at $installer" }
-          Write-Host "Running: vs_installer modify --add Microsoft.VisualStudio.Workload.Universal on $installPath"
-          & $installer modify --installPath "$installPath" --add Microsoft.VisualStudio.Workload.Universal --includeDependencies --quiet --norestart --nocache *>&1
+          Write-Host "Running vs_installer modify --add Microsoft.VisualStudio.Workload.Universal --includeDependencies --wait --passive --norestart --nocache"
+          & $installer modify --installPath "$installPath" --add Microsoft.VisualStudio.Workload.Universal --includeDependencies --wait --passive --norestart --nocache *>&1
           Write-Host "vs_installer exit code = $LASTEXITCODE"
           if ($LASTEXITCODE -ne 0) { throw "vs_installer modify failed (exit $LASTEXITCODE)" }
+          Write-Host "### post-install verification ###"
+          Write-Host "VS Uap.targets: $(Test-Path (Join-Path $installPath 'MSBuild\Microsoft\Windows Kits\10\MSBuild\Microsoft.Uap.targets'))"
+          Write-Host "SDK Uap.targets: $(Test-Path 'C:\Program Files (x86)\Windows Kits\10\MSBuild\Microsoft.Uap.targets')"
+          Write-Host "UAP .uap ref packs (References):"
+          Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\References' -Recurse -Filter '*.uap' -Directory -ErrorAction SilentlyContinue | Select-Object -Expand FullName | Write-Host
+          Write-Host "dotnet packs Microsoft.UAP.Ref.*:"
+          Get-ChildItem 'C:\Program Files\dotnet\packs' -Filter 'Microsoft.UAP.Ref.*' -Directory -ErrorAction SilentlyContinue | Select-Object -Expand Name | Write-Host
 
       - name: Build unsigned MSIX (SideloadOnly)
         run: |
-          $refs = 'C:\Program Files (x86)\Windows Kits\10\References'
-          $pack = Get-ChildItem $refs -Filter '10.0.*.uap' -Directory 2>$null |
-                  Sort-Object { [version]($_.Name -replace '\.uap$','') } -Descending |
-                  Select-Object -First 1
-          if (-not $pack) { throw "No UAP reference pack (10.0.*.uap) found under $refs -- install Win10 SDK + UWP workload" }
-          $tpi = $pack.Name -replace '\.uap$',''
-          Write-Host "Installed UAP ref pack: $($pack.Name) -> TargetPlatformVersion=$tpi"
-          $tfm = "uap" + $tpi
+          $v = $null
+          $p = Get-ChildItem 'C:\Program Files\dotnet\packs' -Filter 'Microsoft.UAP.Ref.*' -Directory -ErrorAction SilentlyContinue |
+               Sort-Object { [version]($_.Name -replace 'Microsoft.UAP.Ref.','') } -Descending | Select-Object -First 1
+          if ($p) { $v = $p.Name -replace 'Microsoft.UAP.Ref.',''; Write-Host "SDK-style UAP pack: $($p.Name) -> $v" }
+          if (-not $v) {
+            $rp = Get-ChildItem 'C:\Program Files (x86)\Windows Kits\10\References' -Recurse -Filter '*.uap' -Directory -ErrorAction SilentlyContinue |
+                  Sort-Object { [version]($_.Name -replace '\.uap$','') } -Descending | Select-Object -First 1
+            if ($rp) { $v = $rp.Name -replace '\.uap$',''; Write-Host "Legacy UAP ref pack: $($rp.Name) -> $v" }
+          }
+          if (-not $v) { throw "No UAP reference pack found in dotnet\packs or References -- install VS Universal workload + Win10 SDK UAP refs" }
+          $tfm = "uap" + $v
+          Write-Host "Using UAP TFM: $tfm"
           (Get-Content 'uwp\XboxAgent.csproj' -Raw) -replace 'uap10\.0\.\d+', $tfm | Set-Content -NoNewline 'uwp\XboxAgent.csproj'
           Write-Host "csproj TFM: $(Select-String -Path 'uwp\XboxAgent.csproj' -Pattern 'TargetFramework')"
           msbuild "uwp\XboxAgent.csproj" /p:Configuration=Release /p:Platform=x64 /p:GenerateAppxPackageOnBuild=true /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxBundle=Never /p:AppxPackageSigningEnabled=false /p:AppxPackageDir="$env:GITHUB_WORKSPACE\Packages" /m /v:minimal
