@@ -251,6 +251,7 @@ app.mount("/web", StaticFiles(directory=str(WEB_DIR)), name="web")
 @app.websocket("/ws")
 async def ws_endpoint(ws: WebSocket):
     await mgr.connect(ws)
+    await mgr.send({"type": "ready"})
     try:
         while True:
             raw = await ws.receive_text()
