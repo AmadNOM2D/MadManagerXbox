@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:mp="http://schemas.microsoft.com/appx/2014/phone/manifest"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/windows10">
+  <Identity Name="40459Hermes.MadManagerXbox" Publisher="CN=40459Hermes" Version="1.0.0.0" />
+  <Properties>
+    <DisplayName>Mad Manager</DisplayName>
+    <PublisherDisplayName>Mark Wallace</PublisherDisplayName>
+    <Logo>Assets\StoreLogo.png</Logo>
+  </Properties>
+  <Resources Language="en-us" />
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Xbox" MinVersion="10.0.0.0" MaxVersion="10.0.99999.0" />
+  </Dependencies>
+  <Principals>
+    <Capability Name="internetClient" />
+    <Capability Name="privateNetworkClientServer" />
+  </Principals>
+  <Applications>
+    <Application Id="App" Executable="$targetnametoken$.exe" EntryPoint="MadManagerXbox.App">
+      <uap:VisualElements DisplayName="Mad Manager" Square150x150Logo="Assets\Square150x150Logo.png" Square44x44Logo="Assets\Square44x44Logo.png" Description="Mad Manager agent client">
+        <uap:SplashScreen BackgroundColor="#000000" />
+        <uap:InitialRotationPreference>
+          <uap:Supporters>
+            <uap:Support Orientation="landscape" />
+          </uap:Supporters>
+        </uap:InitialRotationPreference>
+      </uap:VisualElements>
+    </Application>
+  </Applications>
+</Package>

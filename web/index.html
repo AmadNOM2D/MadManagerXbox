@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Mad Manager</title>
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:#0b0f14;color:#e8e8e8;overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100%;}
+  #messages{flex:1;overflow-y:auto;padding:24px 32px;display:flex;flex-direction:column;gap:14px;}
+  .msg{max-width:760px;word-wrap:break-word;line-height:1.45;}
+  .user{margin-left:auto;text-align:right;}
+  .agent{color:#cfcff7;}
+  .bubble{padding:8px 14px;border-radius:14px;display:inline-block;}
+  .user .bubble{background:#2a427a;border-radius:20px 6px 20px 20px;}
+  .agent .bubble{background:#1e2430;border:1px solid #2d3748;border-radius:6px 20px 20px 20px;}
+  .toolbubble{background:#2b1f14;border:1px solid #5a4620;border-radius:8px;padding:6px 10px;font-family:monospace;font-size:13px;color:#ffd89c;word-break:break-all;}
+  .resbubble{background:#141a20;border:1px solid #2a3a4a;border-radius:8px;padding:6px 10px;font-family:monospace;font-size:13px;color:#a8c4ff;max-height:160px;overflow:auto;white-space:pre-wrap;}
+  #inputbar{display:flex;align-items:center;padding:16px 24px;background:#13171e;border-top:1px solid #202630;}
+  #input{flex:1;background:#1b1f27;border:1px solid #2e3644;border-radius:10px;color:#e8e8e8;padding:12px 16px;font-size:17px;outline:none;}
+  #send{min-width:80px;height:40px;margin-left:12px;background:#3b5a91;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;}
+  #send:disabled{opacity:.45;cursor:not-allowed;}
+  #status{position:absolute;top:8px;right:150px;font-size:12px;color:#6a8cff;z-index:5;pointer-events:none;}
+  /* Avatar dock — ALWAYS in motion (hard rule: never a frozen avatar) */
+  #avatardock{position:absolute;top:20px;right:20px;width:124px;height:124px;z-index:10;pointer-events:none;}
+  #avatar{position:relative;width:124px;height:124px;}
+  .ring{position:absolute;inset:0;border:2px solid #4a78c2;border-radius:50%;opacity:.6;animation:spin 14s linear infinite;}
+  .ring2{position:absolute;inset:8px;border:1px solid #6aa0ff;border-radius:50%;opacity:.35;animation:spin 22s linear infinite reverse;}
+  .ring3{position:absolute;inset:16px;border:1px solid #3b5a91;border-radius:50%;opacity:.25;animation:spin 30s linear infinite;}
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .dot{position:absolute;width:14px;height:14px;border-radius:50%;background:#7fb0ff;box-shadow:0 0 8px #7fb0ff;animation:float 3s ease-in-out infinite alternate;}
+  @keyframes float{0%{top:22px;left:44px;transform:scale(1);}50%{top:54px;left:48px;transform:scale(1.25);}100%{top:22px;left:44px;transform:scale(1);}}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="status">offline</div>
+  <div id="avatardock"><div id="avatar"><div class="ring"></div><div class="ring2"></div><div class="ring3"></div><div class="dot"></div></div></div>
+  <div id="messages"></div>
+  <div id="inputbar">
+    <input id="input" placeholder="Ask the Mad Manager..." autocomplete="off" />
+    <button id="send" disabled>Send</button>
+  </div>
+</div>
+<script>
+(function(){
+  var apiBase='';
+  var ws=null;
+  var buf=document.getElementById('messages');
+  var input=document.getElementById('input');
+  var send=document.getElementById('send');
+  var status=document.getElementById('status');
+  var activeBubble=null;   // current agent message element being streamed
+
+  function esc(s){ return String(s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+
+  function addMsg(cls){
+    var m=document.createElement('div'); m.className='msg '+cls;
+    var b=document.createElement('div'); b.className='bubble';
+    m.appendChild(b); buf.appendChild(m); buf.scrollTop=buf.scrollHeight;
+    return b;
+  }
+  function addTool(name,arg){
+    var b=addMsg('agent');
+    b.innerHTML='<em>🔧 '+esc(name)+': '+esc(arg||'')+'</em>';
+  }
+  function addResult(content){
+    var b=addMsg('agent');
+    b.innerHTML='<span class="resbubble">'+esc(content||'')+'</span>';
+    buf.scrollTop=buf.scrollHeight;
+  }
+
+  function appendDelta(content){
+    if(!activeBubble){ activeBubble=addMsg('agent'); }
+    activeBubble.textContent+=(content||'');
+    buf.scrollTop=buf.scrollHeight;
+  }
+  function endTurn(){ activeBubble=null; input.focus(); }
+
+  function setOnline(on){ status.textContent = on ? 'online' : 'offline'; }
+
+  function fetchConfig(){
+    return fetch('config.json',{cache:'no-store'}).then(function(r){return r.json();});
+  }
+
+  function connect(){
+    if(ws){ try{ws.close();}catch(e){} }
+    ws=new WebSocket(apiBase+'/ws');
+    ws.onopen=function(){ setOnline(true); send.disabled=false; if(activeBubble){activeBubble.textContent+='(connected)';} };
+    ws.onclose=function(){ setOnline(false); send.disabled=true; setTimeout(connect,2000); };
+    ws.onerror=function(){ setOnline(false); };
+    ws.onmessage=function(ev){
+      var d; try{ d=JSON.parse(ev.data); }catch(e){ return; }
+      if(d.type==='ready'){ send.disabled=false; }
+      else if(d.type==='start'){ activeBubble=addMsg('agent'); }
+      else if(d.type==='delta'){ appendDelta(d.content); }
+      else if(d.type==='tool'){ addTool(d.name,d.arg); }
+      else if(d.type==='tool_result'){ addResult(d.content); }
+      else if(d.type==='tool_done'){}
+      else if(d.type==='end'){ endTurn(); }
+      else if(d.type==='error'){ appendDelta('\n[error: '+(d.content||'')+']'); endTurn(); }
+      else if(d.type==='pong'){}
+    };
+  }
+
+  function sendChat(){
+    var txt=input.value.trim(); if(!txt||!ws||ws.readyState!==1) return;
+    // echo user bubble
+    var b=addMsg('user'); b.innerHTML='<span class="bubble">'+esc(txt)+'</span>';
+    input.value=''; send.disabled=true;
+    ws.send(JSON.stringify({type:'chat',content:txt}));
+  }
+
+  document.getElementById('send').addEventListener('click',sendChat);
+  input.addEventListener('keypress',function(e){ if(e.key==='Enter') sendChat(); });
+
+  fetchConfig().then(function(c){ apiBase=c.apiBase||''; connect(); }).catch(function(){
+    var b=addMsg('agent'); b.innerHTML='<em>Could not load config.json — check the agent server.</em>';
+  });
+})();
+</script>
+</body>
+</html>
